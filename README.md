@@ -27,8 +27,4 @@ the window manager.  As the following:
 
 	xroot -l xterm &
 
-Read the manual for more information on running xmenu.
-
-§ LICENSE
-
-This software is in the public domain and is provided AS IS, with NO WARRANTY.
+Read the [manual](https://github.com/the-repo-club/xroot/wiki) for more information on running xroot
