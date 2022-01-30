@@ -12,7 +12,7 @@ static Display *dpy;
 static Window rootwin;
 static int screen;
 
-/* xclickroot: execute a command by clicking on the root window */
+/* xroot: execute a command by clicking on the root window */
 int
 main(int argc, char *argv[])
 {
@@ -78,6 +78,6 @@ main(int argc, char *argv[])
 static void
 usage(void)
 {
-	(void)fprintf(stderr, "usage: xclickroot [-12345lmr] command [args...]\n");
+	(void)fprintf(stderr, "usage: xroot [-12345lmr] command [args...]\n");
 	exit(1);
 }

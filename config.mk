@@ -1,5 +1,5 @@
 #program name
-PROG = xclickroot
+PROG = xroot
 
 # paths
 PREFIX = /usr/local
