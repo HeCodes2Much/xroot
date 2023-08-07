@@ -3,21 +3,24 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+
 #include <X11/Xlib.h>
 
-static void usage(void);
+static void
+usage(void)
+{
+	(void)fprintf(stderr, "usage: xroot [-12345lmr] command [args...]\n");
+	exit(EXIT_FAILURE);
+}
 
-/* X Variables */
-static Display *dpy;
-static Window rootwin;
-static int screen;
-
-/* xroot: execute a command by clicking on the root window */
 int
 main(int argc, char *argv[])
 {
+	struct sigaction sa;
 	unsigned button;
 	XEvent ev;
+	Display *dpy;
+	Window rootwin;
 
 	argv++;
 	argc--;
@@ -44,40 +47,50 @@ main(int argc, char *argv[])
 	if (argc == 0)
 		usage();
 
+	/* don't leave zombies around */
+	sa.sa_handler = SIG_IGN;
+	sa.sa_flags = SA_NOCLDSTOP | SA_NOCLDWAIT | SA_RESTART;
+	if (sigemptyset(&sa.sa_mask) == -1)
+		err(EXIT_FAILURE, "sigemptyset");
+	if (sigaction(SIGCHLD, &sa, NULL) == -1)
+		err(EXIT_FAILURE, "sigaction");
+
 	/* open connection to server and set X variables */
 	if ((dpy = XOpenDisplay(NULL)) == NULL)
-		errx(1, "cannot open display");
-	screen = DefaultScreen(dpy);
+		errx(EXIT_FAILURE, "cannot open display");
+
+#if __OpenBSD__
+	/*
+	 * rpath: xlib needs it at runtime (for e.g. reading the error db)
+	 * proc exec: running the program
+	 */
+	if (pledge("stdio rpath proc exec", NULL) == -1)
+		err(EXIT_FAILURE, "pledge");
+#endif
+
 	rootwin = DefaultRootWindow(dpy);
-
-	signal(SIGCHLD, SIG_IGN);
-
 	XGrabButton(dpy, button, AnyModifier, rootwin, False, ButtonPressMask,
 	            GrabModeSync, GrabModeSync, None, None);
-
 	while (!XWindowEvent(dpy, rootwin, ButtonPressMask, &ev)) {
-		switch (ev.type) {
-		case ButtonPress:
-			if (ev.xbutton.button == button && ev.xbutton.subwindow == None) {
-				if (fork() == 0) {
-					execvp(*argv, argv);
-					err(127, NULL);
-				}
+		if (ev.type == ButtonPress) {
+			if (ev.xbutton.button != button || ev.xbutton.subwindow != None) {
+				XAllowEvents(dpy, ReplayPointer, CurrentTime);
+				continue;
 			}
+			XUngrabPointer(dpy, ev.xbutton.time);
 			XAllowEvents(dpy, ReplayPointer, CurrentTime);
-			break;
+			XFlush(dpy);
+			switch (fork()) {
+			case -1:
+				warn("can't fork");
+				break;
+			case 0:
+				execvp(*argv, argv);
+				warn("can't exec %s", *argv);
+				_exit(127);
+			}
 		}
 	}
-
 	XCloseDisplay(dpy);
-
 	return 0;
-}
-
-/* show usage */
-static void
-usage(void)
-{
-	(void)fprintf(stderr, "usage: xroot [-12345lmr] command [args...]\n");
-	exit(1);
 }
